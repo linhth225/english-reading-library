@@ -3,12 +3,18 @@ import { getStore } from "@netlify/blobs";
 const STORE_NAME = "english-reading-library";
 const KEY = "articles";
 
+// Strong consistency is required because this function updates the existing
+// "articles" blob and immediately reads it back to verify the write.
+function openStore() {
+  return getStore({ name: STORE_NAME, consistency: "strong" });
+}
+
 export default async (request) => {
-  const store = getStore(STORE_NAME);
+  const store = openStore();
 
   if (request.method === "GET") {
     try {
-      const saved = await store.get(KEY, { type: "json" });
+      const saved = await store.get(KEY, { type: "json", consistency: "strong" });
       const articles = Array.isArray(saved) ? saved : [];
       return json({ ok: true, articles, count: articles.length });
     } catch (error) {
@@ -44,7 +50,7 @@ export default async (request) => {
         return json({ error: "Bài viết cần có tiêu đề và nội dung." }, 400);
       }
 
-      const existing = await store.get(KEY, { type: "json" });
+      const existing = await store.get(KEY, { type: "json", consistency: "strong" });
       const current = Array.isArray(existing) ? existing : [];
 
       const safeArticle = {
@@ -62,20 +68,27 @@ export default async (request) => {
         ...current.filter(item => item && item.id !== safeArticle.id)
       ];
 
-      await store.setJSON(KEY, updated);
+      const writeResult = await store.setJSON(KEY, updated);
 
-      // Read the data back before telling the browser that the save succeeded.
-      const check = await store.get(KEY, { type: "json" });
+      // Read-after-write using strong consistency; this should see the new blob.
+      const check = await store.get(KEY, { type: "json", consistency: "strong" });
       const confirmed = Array.isArray(check) ? check : [];
       const savedArticle = confirmed.find(item => item.id === safeArticle.id);
 
       if (!savedArticle) {
-        throw new Error("Đã ghi dữ liệu nhưng không tìm thấy bài khi đọc kiểm tra lại.");
+        console.error("Blob write/read verification mismatch", {
+          store: STORE_NAME,
+          key: KEY,
+          writeResult,
+          expectedArticleId: safeArticle.id,
+          returnedCount: confirmed.length
+        });
+        throw new Error("Không tìm thấy bài vừa lưu trong lần đọc xác nhận strong consistency.");
       }
 
       return json({
         ok: true,
-        message: "Article saved and verified.",
+        message: "Article saved and verified with strong consistency.",
         article: savedArticle,
         articles: confirmed,
         count: confirmed.length
