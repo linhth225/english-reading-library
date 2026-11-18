@@ -24,8 +24,9 @@
     aside{background:var(--paper);border:1px solid var(--line);border-radius:17px;padding:20px;position:sticky;top:18px}.aside-title{font-weight:800;margin-bottom:12px}.goal{background:#f8f3e7;border-radius:13px;padding:14px;margin:12px 0}.goal strong{display:block;font-size:23px;color:var(--green)}.goal small{color:var(--muted)}.tip{font-size:13px;color:var(--muted);border-top:1px solid var(--line);padding-top:13px;margin-top:14px}
     .reader{display:none;background:var(--paper);border:1px solid var(--line);border-radius:20px;padding:clamp(20px,4vw,42px);box-shadow:var(--shadow);margin-top:18px}.reader-top{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}.reader h2{font-size:clamp(25px,4vw,35px);line-height:1.2;margin:19px 0 8px}.reader-meta{color:var(--muted);font-size:13px;margin-bottom:25px}.reading-text{font-family:Georgia,serif;font-size:20px;line-height:2.05;color:#293a32;max-width:780px}.reading-text p{margin:0 0 17px}.word{cursor:pointer;border-radius:4px;padding:0 1px;transition:background .12s;-webkit-tap-highlight-color:rgba(216,168,78,.25)}.word:hover,.word:focus{background:#f5e6b8;outline:none}.word.active{background:#f4dfa0;box-shadow:0 2px 0 var(--gold)}
     .reader-note{font-family:inherit;font-size:13px;color:var(--muted);border-top:1px solid var(--line);padding-top:18px;margin-top:25px}
-    .word-panel{display:none;position:fixed;z-index:20;right:22px;bottom:22px;width:min(390px,calc(100vw - 28px));background:white;border:1px solid var(--line);border-radius:18px;box-shadow:0 18px 60px rgba(20,35,28,.2);padding:19px}.word-panel.show{display:block;animation:pop .16s ease-out}@keyframes pop{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-    .panel-head{display:flex;justify-content:space-between;align-items:start;gap:10px}.panel-head h3{font-size:23px;margin:0}.close{border:0;background:#f2f3ee;border-radius:50%;width:30px;height:30px}.ipa{font-size:13px;color:var(--green);font-weight:700;margin:2px 0 12px}.meaning{font-size:16px;font-weight:750;margin-bottom:7px}.panel-label{font-size:10px;letter-spacing:1px;color:var(--muted);font-weight:800;text-transform:uppercase;margin:13px 0 3px}.panel-copy{font-size:13px;color:#4e5c55;margin:0}.panel-actions{display:flex;gap:8px;margin-top:13px}.panel-actions button{border:1px solid var(--line);background:#fafaf7;border-radius:9px;padding:8px 11px;font-size:12px;font-weight:700}
+    .word-panel{display:none;position:fixed;z-index:20;right:22px;bottom:22px;width:min(360px,calc(100vw - 28px));max-height:min(72vh,560px);overflow-y:auto;background:white;border:1px solid var(--line);border-radius:18px;box-shadow:0 18px 60px rgba(20,35,28,.2);padding:20px}.word-panel.show{display:block;animation:pop .16s ease-out}@keyframes pop{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+    .panel-head{display:flex;justify-content:space-between;align-items:center;gap:10px;padding-bottom:12px;border-bottom:1px solid var(--line)}.panel-head h3{font-size:25px;margin:0;color:var(--ink)}.close{border:0;background:#f2f3ee;border-radius:50%;width:32px;height:32px;font-size:20px;cursor:pointer}.dictionary-item{padding:13px 0;border-bottom:1px solid #edf0eb}.dictionary-item:last-child{border-bottom:0;padding-bottom:0}.dictionary-label{font-size:11px;letter-spacing:.5px;color:var(--muted);font-weight:800;margin-bottom:6px}.meaning{font-size:18px;font-weight:750;color:var(--green);line-height:1.45}.context-translation{font-size:13px;color:#68766e;line-height:1.5;margin:5px 0 0}.ipa{font-size:14px;color:var(--green);font-weight:700;margin:0}.ipa-large{font-size:20px;letter-spacing:.2px}.pronounce-button{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:#f8faf7;color:var(--ink);border-radius:11px;padding:11px 15px;font-size:14px;font-weight:750;cursor:pointer}.pronounce-button:hover{background:#edf4ef}
+    @media(max-width:580px){.word-panel{right:10px;bottom:10px;width:calc(100vw - 20px);padding:17px;max-height:70vh}}
     .admin{display:none;background:white;border:1px solid var(--line);border-radius:18px;padding:22px;margin-top:20px}.admin.show{display:block}.admin h3{margin-top:0}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field{display:flex;flex-direction:column;gap:5px}.field.full{grid-column:1/-1}.field label{font-size:12px;color:var(--muted);font-weight:750}.field input,.field textarea,.field select{border:1px solid var(--line);border-radius:10px;padding:10px;background:#fffefa}.field textarea{min-height:180px;resize:vertical}.admin-actions{display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap}.status{font-size:12px;color:var(--muted)}.empty{grid-column:1/-1;text-align:center;padding:35px;color:var(--muted);background:white;border-radius:15px}
     footer{text-align:center;color:#89948d;font-size:12px;padding:35px 0 10px}
     @media(max-width:850px){.layout{grid-template-columns:1fr}aside{position:static}.hero-mark{display:none}}
@@ -87,13 +88,29 @@
   <footer>Made for your English journey · A2–B1 · Personal learning library</footer>
 </div>
 
-<div class="word-panel" id="wordPanel" role="dialog" aria-live="polite">
-  <div class="panel-head"><div><h3 id="wordTitle">word</h3><div class="ipa" id="wordIpa">Đang tra phiên âm...</div></div><button class="close" id="closeWord">×</button></div>
-  <div class="meaning" id="wordMeaning">Đang tìm nghĩa tiếng Việt...</div>
-  <div class="panel-label">In this context</div><p class="panel-copy" id="wordContext"></p>
-  <div class="panel-label">How to use it</div><p class="panel-copy" id="wordUsage">Cách dùng thông dụng của từ.</p>
-  <div class="panel-label">Easy example · A2</div><p class="panel-copy" id="wordExample"></p>
-  <div class="panel-actions"><button id="speakWord">🔊 Nghe phát âm</button><button id="copyWord">Copy từ</button></div>
+<div class="word-panel" id="wordPanel" role="dialog" aria-live="polite" aria-label="Tra từ">
+  <div class="panel-head">
+    <h3 id="wordTitle">word</h3>
+    <button class="close" id="closeWord" aria-label="Đóng">×</button>
+  </div>
+
+  <section class="dictionary-item">
+    <div class="dictionary-label">1. Nghĩa trong câu</div>
+    <div class="meaning" id="wordMeaning">Đang tìm nghĩa...</div>
+    <p class="context-translation" id="wordContext"></p>
+  </section>
+
+  <section class="dictionary-item">
+    <div class="dictionary-label">2. Phiên âm IPA</div>
+    <div class="ipa ipa-large" id="wordIpa">Đang tra IPA...</div>
+  </section>
+
+  <section class="dictionary-item pronunciation-item">
+    <div class="dictionary-label">3. Phát âm</div>
+    <button class="pronounce-button" id="speakWord" type="button">
+      <span aria-hidden="true">🔊</span> Nghe phát âm
+    </button>
+  </section>
 </div>
 
 <script>
@@ -273,11 +290,9 @@ async function lookupWord(word, el) {
   el.classList.add("active");
 
   $("wordTitle").textContent = word;
-  $("wordIpa").textContent = "Đang tra phiên âm...";
-  $("wordMeaning").textContent = "Đang tìm nghĩa tiếng Việt...";
-  $("wordContext").textContent = activeSentence;
-  $("wordUsage").textContent = "Đang tìm cách dùng...";
-  $("wordExample").textContent = "Đang tạo ví dụ...";
+  $("wordMeaning").textContent = "Đang tìm nghĩa trong câu...";
+  $("wordContext").textContent = "";
+  $("wordIpa").textContent = "Đang tra IPA...";
   $("wordPanel").classList.add("show");
 
   const normalized = word.toLowerCase().replace(/[’]/g, "'");
@@ -287,34 +302,21 @@ async function lookupWord(word, el) {
     translateToVietnamese(activeSentence)
   ]);
 
-  // Prevent a slow previous lookup from replacing the most recently selected word.
+  // Ignore a slow response if the learner has selected another word.
   if (activeWord !== word) return;
 
-  $("wordIpa").textContent = dictionary?.phonetic || "Chưa có phiên âm IPA cho từ này";
+  const contraction = contractionMeanings[normalized] || "";
   $("wordMeaning").textContent =
-    contractionMeanings[normalized] ||
-    meaning ||
-    "Chưa tìm được nghĩa tự động. Hãy thử lại khi có kết nối mạng.";
+    contraction || meaning || "Chưa tìm được nghĩa tự động cho từ này.";
 
+  // The sentence translation gives the learner context without adding extra sections.
   $("wordContext").textContent = contextTranslation
-    ? `${activeSentence}\n→ ${contextTranslation}`
-    : activeSentence;
+    ? `Câu trong bài: ${contextTranslation}`
+    : "";
 
-  $("wordUsage").textContent = dictionary?.definition
-    ? `Từ điển nhận diện: ${dictionary.matchedWord}. Nghĩa tiếng Anh: ${dictionary.definition}`
-    : "Từ điển chưa có định nghĩa cho dạng từ này. Hãy dựa vào bản dịch cả câu để hiểu ngữ cảnh.";
+  $("wordIpa").textContent = dictionary?.phonetic || "Chưa có phiên âm IPA cho từ này";
 
-  $("wordExample").textContent = `I use “${word}” in a simple sentence.`;
   $("speakWord").onclick = () => speak(word);
-  $("copyWord").onclick = async () => {
-    try {
-      await navigator.clipboard.writeText(word);
-      $("copyWord").textContent = "Đã copy ✓";
-      setTimeout(() => $("copyWord").textContent = "Copy từ", 1200);
-    } catch (error) {
-      $("copyWord").textContent = "Không copy được";
-    }
-  };
 }
 function speak(text){if(!("speechSynthesis"in window)){alert("Trình duyệt không hỗ trợ đọc văn bản.");return;}speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang="en-US";u.rate=.85;speechSynthesis.speak(u);}
 $("closeWord").onclick=()=>{$("wordPanel").classList.remove("show");document.querySelectorAll(".word.active").forEach(x=>x.classList.remove("active"));};
