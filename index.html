@@ -26,6 +26,7 @@
     .reader-note{font-family:inherit;font-size:13px;color:var(--muted);border-top:1px solid var(--line);padding-top:18px;margin-top:25px}
     .word-panel{display:none;position:fixed;z-index:20;right:22px;bottom:22px;width:min(360px,calc(100vw - 28px));max-height:min(72vh,560px);overflow-y:auto;background:white;border:1px solid var(--line);border-radius:18px;box-shadow:0 18px 60px rgba(20,35,28,.2);padding:20px}.word-panel.show{display:block;animation:pop .16s ease-out}@keyframes pop{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
     .panel-head{display:flex;justify-content:space-between;align-items:center;gap:10px;padding-bottom:12px;border-bottom:1px solid var(--line)}.panel-head h3{font-size:25px;margin:0;color:var(--ink)}.close{border:0;background:#f2f3ee;border-radius:50%;width:32px;height:32px;font-size:20px;cursor:pointer}.dictionary-item{padding:13px 0;border-bottom:1px solid #edf0eb}.dictionary-item:last-child{border-bottom:0;padding-bottom:0}.dictionary-label{font-size:11px;letter-spacing:.5px;color:var(--muted);font-weight:800;margin-bottom:6px}.meaning{font-size:18px;font-weight:750;color:var(--green);line-height:1.45}.context-translation{font-size:13px;color:#68766e;line-height:1.5;margin:5px 0 0}.ipa{font-size:14px;color:var(--green);font-weight:700;margin:0}.ipa-large{font-size:20px;letter-spacing:.2px}.pronounce-button{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:#f8faf7;color:var(--ink);border-radius:11px;padding:11px 15px;font-size:14px;font-weight:750;cursor:pointer}.pronounce-button:hover{background:#edf4ef}
+    .dictionary-attribution{font-size:10px;color:#718078;margin-top:12px;line-height:1.5}.dictionary-attribution a{color:inherit;text-decoration:underline}.dictionary-notice{font-size:12px;color:#718078;line-height:1.45;margin-top:5px}.pronounce-button:disabled{opacity:.55;cursor:wait}
     @media(max-width:580px){.word-panel{right:10px;bottom:10px;width:calc(100vw - 20px);padding:17px;max-height:70vh}}
     .admin{display:none;background:white;border:1px solid var(--line);border-radius:18px;padding:22px;margin-top:20px}.admin.show{display:block}.admin h3{margin-top:0}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field{display:flex;flex-direction:column;gap:5px}.field.full{grid-column:1/-1}.field label{font-size:12px;color:var(--muted);font-weight:750}.field input,.field textarea,.field select{border:1px solid var(--line);border-radius:10px;padding:10px;background:#fffefa}.field textarea{min-height:180px;resize:vertical}.admin-actions{display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap}.status{font-size:12px;color:var(--muted)}.empty{grid-column:1/-1;text-align:center;padding:35px;color:var(--muted);background:white;border-radius:15px}
     footer{text-align:center;color:#89948d;font-size:12px;padding:35px 0 10px}
@@ -111,6 +112,7 @@
       <span aria-hidden="true">🔊</span> Nghe phát âm
     </button>
   </section>
+  <div class="dictionary-attribution">Nguồn nghĩa: <a href="https://dict.minhqnd.com/" target="_blank" rel="noopener noreferrer">@minhqnd Dictionary · CC BY-SA 4.0</a> và từ vựng cơ bản được biên soạn bổ sung.</div>
 </div>
 
 <script>
@@ -197,126 +199,55 @@ function openArticle(id){
  activeArticle=articles.find(a=>a.id===id);if(!activeArticle)return;
  $("libraryView").style.display="none";$("readerView").style.display="block";$("adminPanel").classList.remove("show");$("wordPanel").classList.remove("show");
  $("readerTitle").textContent=activeArticle.title;$("readerTag").textContent=activeArticle.level;$("readerMeta").textContent=`${activeArticle.category}  ·  ${activeArticle.date||""}  ·  Chạm vào từ để tra cứu`;
- const paragraphs = activeArticle.body.split(/\\n\\s*\\n/).filter(Boolean);
+ const paragraphs = activeArticle.body.split(/\n\s*\n/).filter(Boolean);
  $("readingText").innerHTML = paragraphs
    .map(p => `<p>${renderClickableText(p.trim())}</p>`)
    .join("");
  window.scrollTo({top:0,behavior:"smooth"});
 }
 function sentenceFor(el){const p=el.closest("p");return p?p.textContent.trim():"";}
-const contractionMeanings = {
-  "don't": "do not – không",
-  "doesn't": "does not – không",
-  "didn't": "did not – đã không",
-  "isn't": "is not – không phải",
-  "aren't": "are not – không phải",
-  "wasn't": "was not – đã không",
-  "weren't": "were not – đã không",
-  "can't": "cannot – không thể",
-  "couldn't": "could not – không thể",
-  "won't": "will not – sẽ không",
-  "wouldn't": "would not – sẽ không",
-  "i'm": "I am – tôi là / tôi đang",
-  "it's": "it is / it has – nó là / nó đã",
-  "they're": "they are – họ là / họ đang",
-  "we're": "we are – chúng tôi là / chúng tôi đang",
-  "you're": "you are – bạn là / bạn đang",
-  "i've": "I have – tôi đã / tôi có",
-  "they've": "they have – họ đã / họ có"
-};
-
-function lookupCandidates(word) {
-  const w = word.toLowerCase().replace(/[’]/g, "'");
-  const list = [w];
-  if (w.endsWith("ies") && w.length > 4) list.push(w.slice(0, -3) + "y");
-  if (w.endsWith("ing") && w.length > 5) {
-    const stem = w.slice(0, -3);
-    list.push(stem, stem + "e");
-    if (/(.)\1$/.test(stem)) list.push(stem.slice(0, -1));
-  }
-  if (w.endsWith("ed") && w.length > 4) {
-    const stem = w.slice(0, -2);
-    list.push(stem, stem + "e");
-    if (/(.)\1$/.test(stem)) list.push(stem.slice(0, -1));
-  }
-  if (w.endsWith("es") && w.length > 4) list.push(w.slice(0, -2), w.slice(0, -1));
-  else if (w.endsWith("s") && w.length > 3) list.push(w.slice(0, -1));
-  return [...new Set(list)];
-}
-
-async function getDictionaryData(word) {
-  for (const candidate of lookupCandidates(word)) {
-    try {
-      const response = await fetch(
-        `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(candidate)}`,
-        { signal: AbortSignal.timeout(7000) }
-      );
-      if (!response.ok) continue;
-      const data = await response.json();
-      const entry = data?.[0];
-      if (!entry) continue;
-      const phonetic = (entry.phonetics || []).find(item => item.text)?.text || entry.phonetic || "";
-      const definition = (entry.meanings || [])
-        .flatMap(meaning => meaning.definitions || [])
-        .map(item => item.definition)
-        .find(Boolean) || "";
-      if (phonetic || definition) return { matchedWord: candidate, phonetic, definition };
-    } catch (error) {
-      // Continue to the next possible base form.
-    }
-  }
-  return null;
-}
-
-async function translateToVietnamese(text) {
-  try {
-    const response = await fetch(
-      `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|vi`,
-      { signal: AbortSignal.timeout(9000) }
-    );
-    if (!response.ok) return "";
-    const data = await response.json();
-    if (data.responseStatus && Number(data.responseStatus) !== 200) return "";
-    return data.responseData?.translatedText || "";
-  } catch (error) {
-    return "";
-  }
-}
+// V6: tra qua từ điển Anh–Việt có cấu trúc + từ gốc; không dùng dịch máy MyMemory.
+let currentLookupRequest = 0;
+const dictionaryCache = new Map();
 
 async function lookupWord(word, el) {
+  const requestId = ++currentLookupRequest;
   activeWord = word;
   activeSentence = sentenceFor(el);
-  document.querySelectorAll(".word.active").forEach(item => item.classList.remove("active"));
-  el.classList.add("active");
+  document.querySelectorAll('.word.active').forEach(x => x.classList.remove('active'));
+  el.classList.add('active');
 
-  $("wordTitle").textContent = word;
-  $("wordMeaning").textContent = "Đang tìm nghĩa trong câu...";
-  $("wordContext").textContent = "";
-  $("wordIpa").textContent = "Đang tra IPA...";
-  $("wordPanel").classList.add("show");
+  $('wordTitle').textContent = word;
+  $('wordMeaning').textContent = 'Đang tra nghĩa Anh–Việt...';
+  $('wordIpa').textContent = 'Đang tra IPA...';
+  $('wordContext').textContent = '';
+  $('speakWord').disabled = false;
+  $('speakWord').onclick = () => speak(word);
+  $('wordPanel').classList.add('show');
 
-  const normalized = word.toLowerCase().replace(/[’]/g, "'");
-  const [dictionary, meaning, contextTranslation] = await Promise.all([
-    getDictionaryData(normalized),
-    translateToVietnamese(normalized),
-    translateToVietnamese(activeSentence)
-  ]);
-
-  // Ignore a slow response if the learner has selected another word.
-  if (activeWord !== word) return;
-
-  const contraction = contractionMeanings[normalized] || "";
-  $("wordMeaning").textContent =
-    contraction || meaning || "Chưa tìm được nghĩa tự động cho từ này.";
-
-  // The sentence translation gives the learner context without adding extra sections.
-  $("wordContext").textContent = contextTranslation
-    ? `Câu trong bài: ${contextTranslation}`
-    : "";
-
-  $("wordIpa").textContent = dictionary?.phonetic || "Chưa có phiên âm IPA cho từ này";
-
-  $("speakWord").onclick = () => speak(word);
+  const key = `${word.toLowerCase()}|${activeSentence.toLowerCase()}`;
+  try {
+    let data = dictionaryCache.get(key);
+    if (!data) {
+      const url = `/.netlify/functions/dictionary-free?word=${encodeURIComponent(word)}&context=${encodeURIComponent(activeSentence.slice(0,700))}`;
+      const response = await fetch(url, {cache:'no-store'});
+      data = await response.json();
+      if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+      dictionaryCache.set(key, data);
+    }
+    if (requestId !== currentLookupRequest) return;
+    $('wordMeaning').textContent = data.meaning_vi || 'Chưa có nghĩa đáng tin cậy trong nguồn từ điển.';
+    $('wordIpa').textContent = data.ipa || 'Chưa tìm được IPA đáng tin cậy.';
+    // Only show a tiny note when the original form was resolved to its base form.
+    $('wordContext').textContent = data.note || '';
+    $('speakWord').onclick = () => speak(word);
+  } catch (error) {
+    if (requestId !== currentLookupRequest) return;
+    console.error('V6 dictionary request failed', error);
+    $('wordMeaning').textContent = 'Không kết nối được từ điển. Vui lòng thử lại.';
+    $('wordIpa').textContent = 'Chưa có IPA';
+    $('wordContext').textContent = 'Hãy kiểm tra Netlify Function dictionary-free.';
+  }
 }
 function speak(text){if(!("speechSynthesis"in window)){alert("Trình duyệt không hỗ trợ đọc văn bản.");return;}speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang="en-US";u.rate=.85;speechSynthesis.speak(u);}
 $("closeWord").onclick=()=>{$("wordPanel").classList.remove("show");document.querySelectorAll(".word.active").forEach(x=>x.classList.remove("active"));};
