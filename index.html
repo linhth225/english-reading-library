@@ -229,7 +229,7 @@ async function lookupWord(word, el) {
   try {
     let data = dictionaryCache.get(key);
     if (!data) {
-      const url = `/.netlify/functions/dictionary-free?word=${encodeURIComponent(word)}&context=${encodeURIComponent(activeSentence.slice(0,700))}`;
+      const url = `/.netlify/functions/dictionary-free?v=61&word=${encodeURIComponent(word)}&context=${encodeURIComponent(activeSentence.slice(0,700))}`;
       const response = await fetch(url, {cache:'no-store'});
       data = await response.json();
       if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
