@@ -26,6 +26,12 @@
     .reader-note{font-family:inherit;font-size:13px;color:var(--muted);border-top:1px solid var(--line);padding-top:18px;margin-top:25px}
     .word-panel{display:none;position:fixed;z-index:20;right:22px;bottom:22px;width:min(360px,calc(100vw - 28px));max-height:min(72vh,560px);overflow-y:auto;background:white;border:1px solid var(--line);border-radius:18px;box-shadow:0 18px 60px rgba(20,35,28,.2);padding:20px}.word-panel.show{display:block;animation:pop .16s ease-out}@keyframes pop{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
     .panel-head{display:flex;justify-content:space-between;align-items:center;gap:10px;padding-bottom:12px;border-bottom:1px solid var(--line)}.panel-head h3{font-size:25px;margin:0;color:var(--ink)}.close{border:0;background:#f2f3ee;border-radius:50%;width:32px;height:32px;font-size:20px;cursor:pointer}.dictionary-item{padding:13px 0;border-bottom:1px solid #edf0eb}.dictionary-item:last-child{border-bottom:0;padding-bottom:0}.dictionary-label{font-size:11px;letter-spacing:.5px;color:var(--muted);font-weight:800;margin-bottom:6px}.meaning{font-size:18px;font-weight:750;color:var(--green);line-height:1.45}.context-translation{font-size:13px;color:#68766e;line-height:1.5;margin:5px 0 0}.ipa{font-size:14px;color:var(--green);font-weight:700;margin:0}.ipa-large{font-size:20px;letter-spacing:.2px}.pronounce-button{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:#f8faf7;color:var(--ink);border-radius:11px;padding:11px 15px;font-size:14px;font-weight:750;cursor:pointer}.pronounce-button:hover{background:#edf4ef}
+    .google-fallback{display:none;margin-top:12px;padding:12px;border:1px solid #e0e9e0;border-radius:12px;background:#f8fbf8;gap:8px;flex-direction:column}
+    .google-fallback.show{display:flex}
+    .google-fallback p{font-size:12px;line-height:1.55;color:#66766d;margin:0}
+    .google-fallback-actions{display:flex;gap:8px;flex-wrap:wrap}
+    .google-fallback-actions a{display:inline-flex;align-items:center;text-decoration:none;font-size:13px;font-weight:750;border-radius:9px;padding:9px 12px;background:#315c4c;color:white}
+    .google-fallback-actions a.secondary{background:white;color:#315c4c;border:1px solid #d8e4dc}
     .dictionary-attribution{font-size:10px;color:#718078;margin-top:12px;line-height:1.5}.dictionary-attribution a{color:inherit;text-decoration:underline}.dictionary-notice{font-size:12px;color:#718078;line-height:1.45;margin-top:5px}.pronounce-button:disabled{opacity:.55;cursor:wait}
     @media(max-width:580px){.word-panel{right:10px;bottom:10px;width:calc(100vw - 20px);padding:17px;max-height:70vh}}
     .admin{display:none;background:white;border:1px solid var(--line);border-radius:18px;padding:22px;margin-top:20px}.admin.show{display:block}.admin h3{margin-top:0}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field{display:flex;flex-direction:column;gap:5px}.field.full{grid-column:1/-1}.field label{font-size:12px;color:var(--muted);font-weight:750}.field input,.field textarea,.field select{border:1px solid var(--line);border-radius:10px;padding:10px;background:#fffefa}.field textarea{min-height:180px;resize:vertical}.admin-actions{display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap}.status{font-size:12px;color:var(--muted)}.empty{grid-column:1/-1;text-align:center;padding:35px;color:var(--muted);background:white;border-radius:15px}
@@ -99,6 +105,13 @@
     <div class="dictionary-label">1. Nghĩa trong câu</div>
     <div class="meaning" id="wordMeaning">Đang tìm nghĩa...</div>
     <p class="context-translation" id="wordContext"></p>
+    <div class="google-fallback" id="googleFallback" aria-live="polite">
+      <p id="googleFallbackText">Chưa có nghĩa phù hợp. Bạn có thể tra qua Google Dịch.</p>
+      <div class="google-fallback-actions">
+        <a id="googleWordLink" href="https://translate.google.com/" target="_blank" rel="noopener noreferrer">Tra Google Dịch ↗</a>
+        <a id="googleSentenceLink" class="secondary" href="https://translate.google.com/" target="_blank" rel="noopener noreferrer">Dịch cả câu ↗</a>
+      </div>
+    </div>
   </section>
 
   <section class="dictionary-item">
@@ -206,9 +219,14 @@ function openArticle(id){
  window.scrollTo({top:0,behavior:"smooth"});
 }
 function sentenceFor(el){const p=el.closest("p");return p?p.textContent.trim():"";}
-// V6: tra qua từ điển Anh–Việt có cấu trúc + từ gốc; không dùng dịch máy MyMemory.
+// V6.4: structured English-Vietnamese dictionary first; MyMemory only when missing.
 let currentLookupRequest = 0;
 const dictionaryCache = new Map();
+
+function googleTranslateUrl(text) {
+  // Google Translate consumer website: this is a normal external link, not an API call.
+  return `https://translate.google.com/?sl=en&tl=vi&text=${encodeURIComponent(String(text || '').slice(0, 3500))}&op=translate`;
+}
 
 async function lookupWord(word, el) {
   const requestId = ++currentLookupRequest;
@@ -221,6 +239,10 @@ async function lookupWord(word, el) {
   $('wordMeaning').textContent = 'Đang tra nghĩa Anh–Việt...';
   $('wordIpa').textContent = 'Đang tra IPA...';
   $('wordContext').textContent = '';
+  $('googleFallback').classList.remove('show');
+  $('googleWordLink').href = googleTranslateUrl(word);
+  $('googleSentenceLink').href = googleTranslateUrl(activeSentence);
+  $('googleSentenceLink').style.display = activeSentence && activeSentence !== word ? '' : 'none';
   $('speakWord').disabled = false;
   $('speakWord').onclick = () => speak(word);
   $('wordPanel').classList.add('show');
@@ -236,17 +258,54 @@ async function lookupWord(word, el) {
       dictionaryCache.set(key, data);
     }
     if (requestId !== currentLookupRequest) return;
-    $('wordMeaning').textContent = data.meaning_vi || 'Chưa có nghĩa đáng tin cậy trong nguồn từ điển.';
+    const meaning = String(data.meaning_vi || '').trim();
+    const missing = data.source === 'none' || !meaning || /chưa (?:tìm thấy|có|xác định)/i.test(meaning);
+    $('wordMeaning').textContent = missing
+      ? 'Chưa tìm được nghĩa trong từ điển hiện tại.'
+      : meaning;
+    $('googleFallback').classList.toggle('show', missing);
+    $('googleFallbackText').textContent = 'Bạn có thể kiểm tra nghĩa từ hoặc dịch cả câu trên Google Dịch (mở tab mới).';
     $('wordIpa').textContent = data.ipa || 'Chưa tìm được IPA đáng tin cậy.';
     // Only show a tiny note when the original form was resolved to its base form.
     $('wordContext').textContent = data.note || '';
     $('speakWord').onclick = () => speak(word);
+
+    // Only use machine translation when the structured dictionary has no meaning.
+    // A separate Netlify Function hides the third-party API from browser CORS issues.
+    if (missing) {
+      $('wordMeaning').textContent = 'Đang thử dịch tự động dự phòng...';
+      try {
+        const fallbackUrl = `/.netlify/functions/dictionary-fallback?word=${encodeURIComponent(word)}`;
+        const fallbackResponse = await fetch(fallbackUrl, { cache: 'no-store' });
+        const fallbackData = await fallbackResponse.json().catch(() => ({}));
+        if (requestId !== currentLookupRequest) return;
+        if (fallbackResponse.ok && fallbackData.ok && fallbackData.meaning_vi) {
+          $('wordMeaning').textContent = fallbackData.meaning_vi;
+          $('wordContext').textContent = 'Dịch máy dự phòng (MyMemory) · Nghĩa có thể chưa chính xác.';
+          // The fallback is not guaranteed to be correct, so keep Google links available.
+          $('googleFallback').classList.add('show');
+          $('googleFallbackText').textContent = 'Đây là bản dịch tự động chưa được xác minh. Có thể đối chiếu bằng Google Dịch.';
+        } else {
+          $('wordMeaning').textContent = 'Chưa tìm được nghĩa phù hợp trong các nguồn miễn phí.';
+          $('googleFallback').classList.add('show');
+          $('googleFallbackText').textContent = 'Dịch tự động cũng chưa có kết quả. Hãy thử Google Dịch.';
+        }
+      } catch (fallbackError) {
+        if (requestId !== currentLookupRequest) return;
+        console.warn('MyMemory backup unavailable:', fallbackError);
+        $('wordMeaning').textContent = 'Chưa tìm được nghĩa phù hợp trong các nguồn miễn phí.';
+        $('googleFallback').classList.add('show');
+        $('googleFallbackText').textContent = 'Dịch tự động đang không khả dụng. Bạn vẫn có thể mở Google Dịch.';
+      }
+    }
   } catch (error) {
     if (requestId !== currentLookupRequest) return;
     console.error('V6 dictionary request failed', error);
     $('wordMeaning').textContent = 'Không kết nối được từ điển. Vui lòng thử lại.';
     $('wordIpa').textContent = 'Chưa có IPA';
-    $('wordContext').textContent = 'Hãy kiểm tra Netlify Function dictionary-free.';
+    $('wordContext').textContent = 'Không đọc được dữ liệu từ máy chủ.';
+    $('googleFallback').classList.add('show');
+    $('googleFallbackText').textContent = 'Từ điển đang lỗi kết nối. Bạn vẫn có thể mở Google Dịch để tra cứu.';
   }
 }
 function speak(text){if(!("speechSynthesis"in window)){alert("Trình duyệt không hỗ trợ đọc văn bản.");return;}speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang="en-US";u.rate=.85;speechSynthesis.speak(u);}
