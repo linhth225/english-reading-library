@@ -157,8 +157,42 @@ function pluralMeaning(lemma, gloss) {
   return special[lemma] || `Các ${gloss}`;
 }
 
+// Local, explicit disambiguation for high-confidence everyday contexts.
+// Do not apply a translation chosen from an unrelated dictionary sense.
+// Expand this table with carefully tested rules; otherwise preserve alternative
+// senses instead of pretending that the first dictionary meaning is certain.
+function contextMeaning(word, context) {
+  const w = normalized(word);
+  const sentence = String(context || '').toLowerCase();
+  if (w === 'bump' || w === 'bumps') {
+    const plural = w === 'bumps';
+    const note = plural ? 'Số nhiều của “bump”.' : '';
+    let meaning = '';
+    if (/\b(goose\s*bumps?|goosebumps?)\b/.test(sentence) ||
+        (/\b(hair|hairs)\b/.test(sentence) && /\b(stand|stands|standing|up)\b/.test(sentence))) {
+      meaning = 'những nốt da gà; các nốt nhỏ nổi trên da';
+    } else if (/\b(skin|rash|swell|swelling|face|forehead|arm|arms|leg|legs)\b/.test(sentence)) {
+      meaning = plural ? 'những nốt sưng; các chỗ da nổi gồ' : 'nốt sưng; chỗ da nổi gồ';
+    } else if (/\b(road|street|speed|pavement|surface|path)\b/.test(sentence)) {
+      meaning = plural ? 'những chỗ gồ ghề; các gờ giảm tốc' : 'chỗ gồ ghề; gờ giảm tốc';
+    } else if (/\b(hit|hitting|knock|accident|collision|crash)\b/.test(sentence)) {
+      meaning = plural ? 'những cú va chạm; những cú va đập' : 'cú va chạm; cú va đập';
+    }
+    if (meaning) return {
+      word, base_form:'bump', meaning_vi:meaning,
+      ipa:plural?'/bʌmps/':'/bʌmp/',
+      note, source:'context_rule',
+      other_meanings:['cú va chạm, cú va đập','nốt sưng, chỗ lồi','gờ giảm tốc, chỗ gồ ghề']
+        .filter(x=>!meaning.includes(x))
+    };
+  }
+  return null;
+}
+
 export async function resolveWord(word, context='') {
   const w = normalized(word);
+  const contextual = contextMeaning(word, context);
+  if (contextual) return contextual;
   const contraction = CONTRACTIONS[w];
   if (contraction) return {word,base_form:w,meaning_vi:contraction.vi,ipa:contraction.ipa,source:'curated',note:'Dạng viết tắt'};
 
@@ -209,10 +243,22 @@ export async function resolveWord(word, context='') {
     const best=(filtered.length?filtered:meanings)[0];
     const isPlural=chosen.lemma!==w && chosen.form.includes('plural')
       && !(/động|verb/i.test(best.pos) || inferredPOS==='verb');
-    const vi=isPlural ? pluralMeaning(chosen.lemma,best.vi) : best.vi;
+    // Keep the dictionary gloss itself for unknown plurals: adding 'Các' to
+    // an unrelated first sense would produce nonsense ('Các tiếng vạc kêu').
+    // Only use explicit, reviewed plural glosses when available.
+    const knownPlural = {
+      car:'những chiếc ô tô; các xe hơi', house:'những ngôi nhà',
+      issue:'các vấn đề', child:'những đứa trẻ', student:'các học sinh; sinh viên',
+      story:'những câu chuyện', problem:'những vấn đề', city:'các thành phố'
+    };
+    const vi=isPlural && knownPlural[chosen.lemma]
+      ? knownPlural[chosen.lemma] : best.vi;
+    const alternatives=[...new Set(meanings.map(m=>m.vi))]
+      .filter(v=>v!==best.vi && v!==vi && !morphologyOnly(v)).slice(0,5);
     const ipa=await lookupIPA(w) || (chosen.lemma===w?best.ipa:derivedIPA(w,chosen.lemma,best.ipa,chosen.form));
     return {word,base_form:chosen.lemma,meaning_vi:vi,ipa,
-      note:inflectionNote(w,chosen.lemma,chosen.form,isPlural?'noun':inferredPOS),source:'minhqnd'};
+      note:inflectionNote(w,chosen.lemma,chosen.form,isPlural?'noun':inferredPOS),
+      other_meanings:alternatives, source:'minhqnd'};
   }
 
   // We cannot safely present a grammatical description as the meaning.
