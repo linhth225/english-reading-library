@@ -7,7 +7,7 @@ function json(value, status=200) {
   return new Response(JSON.stringify(value), {
     status, headers: {
       'content-type':'application/json; charset=utf-8',
-      'cache-control':'public, max-age=1800'
+      'cache-control':'no-store'
     }
   });
 }
@@ -123,51 +123,101 @@ async function lookupIPA(form) {
  }catch{return '';}
 }
 
-export async function resolveWord(word,context='') {
- const w=normalized(word);
- const contraction=CONTRACTIONS[w];
- if(contraction)return {word,base_form:w,meaning_vi:contraction.vi,ipa:contraction.ipa,source:'curated',note:'Dạng viết tắt'};
- const variations=forms(w);
- const pos=guessPOS(w,context);
+// Exclude pure inflection labels from the list of translated meanings.
+// Example: "Động từ chia ở ngôi thứ ba số ít của represent" tells us the
+// grammar of "represents", but does NOT tell us what "represent" means.
+const morphologyOnly = text => {
+  const s = String(text || '').trim().toLowerCase();
+  return /^(?:động từ|danh từ|tính từ|trạng từ|phân từ|dạng|thể|số nhiều|quá khứ|ngôi thứ|chia ở|third.person|plural|past tense|present participle|inflection|conjugation)(?:\s|$)/.test(s)
+    && /(?:của|of|ngôi thứ|chia|số nhiều|quá khứ|thì hiện tại|thì quá khứ|phân từ|dạng)/.test(s);
+};
 
- // If a known canonical lemma for a plural is available, prioritize it over an unrelated sense of the inflected spelling.
- const knownDerived=variations.find(f=>f.lemma!==w && CORE[f.lemma]);
- const irregular=IRREGULAR[w]?.[0];
- let chosen=CORE[w] ? variations[0] : (knownDerived || (irregular && CORE[irregular] ? variations[0] : null));
- let meanings=[];
- if(!chosen){
-   for(const candidate of variations){
-     const external=await lookupExternal(candidate.lemma);
-     if(external.length){chosen=candidate; meanings=external;break;}
-     if(CORE[candidate.lemma]){chosen=candidate;break;}
-   }
- }
- if(!chosen)chosen=variations[0];
- const c=CORE[chosen.lemma];
- // Prefer curated baseline for very common words: this avoids unpredictable translation-memory results.
- if(c){
-   // Context-sensitive tweaks for common polysemous words only when the cue is clear.
-   let vi=c.vi;
-   if(chosen.lemma==='work')vi=pos==='noun'?'công việc':pos==='verb'?'làm việc':c.vi;
-   if(chosen.lemma==='like')vi=/\b(like|likes)\s+(?:a|an|the|this|that|my|your)\b/i.test(context)?'thích; giống như':c.vi;
-   if(chosen.lemma==='modern' && /\bhistory\b/i.test(context)) vi='cận đại (khi nói về lịch sử)';
-   if(chosen.lemma==='modern' && /\b(science|technology|building|life|world)\b/i.test(context))vi='hiện đại';
-   const ipa=await lookupIPA(w) || derivedIPA(w,chosen.lemma,c.ipa,chosen.form) || (chosen.lemma===w?c.ipa:'');
-   const described=describeForm(w,chosen.lemma,chosen.form,vi,pos);
-   return {word,base_form:chosen.lemma,meaning_vi:described.meaning,ipa,
-       note:described.note,source:'curated'};
- }
- if(!meanings.length)meanings=await lookupExternal(chosen.lemma);
- if(meanings.length){
-   meanings.sort((a,b)=>scoreMeaning(b,pos)-scoreMeaning(a,pos));
-   const filtered=meanings.filter(m=>scoreMeaning(m,pos)>0);
-   const best=(filtered.length?filtered:meanings)[0];
-   const ipa=await lookupIPA(w) || (chosen.lemma===w?best.ipa:derivedIPA(w,chosen.lemma,best.ipa,chosen.form));
-   return {word,base_form:chosen.lemma,meaning_vi:best.vi,ipa,
-     note:chosen.lemma!==w?`Tra theo từ gốc “${chosen.lemma}”.`: '',source:'minhqnd'};
- }
- return {word,base_form:chosen.lemma,meaning_vi:'Chưa có nghĩa tiếng Việt đáng tin cậy cho từ này.',
-   ipa:await lookupIPA(w),note:'Không dùng bản dịch máy thiếu kiểm chứng.',source:'none'};
+async function lexicalMeanings(lemma) {
+  const raw = await lookupExternal(lemma);
+  return raw.filter(entry => !morphologyOnly(entry.vi));
+}
+
+function inflectionNote(word, lemma, form, pos) {
+  if (word === lemma || !form) return '';
+  const noun = pos === 'noun' || CORE[lemma]?.pos === 'noun';
+  if (form.includes('plural') && noun) return `Số nhiều của “${lemma}”.`;
+  if (form.includes('third-person') || form === '3rd-person' || form.includes('plural')) {
+    return `Ngôi thứ ba số ít của “${lemma}”.`;
+  }
+  if (form === '-ing') return `Dạng -ing của “${lemma}”.`;
+  if (form === 'past') return `Quá khứ của “${lemma}”.`;
+  if (form === 'past participle') return `Phân từ II của “${lemma}”.`;
+  return `Dạng biến đổi của “${lemma}”.`;
+}
+
+function pluralMeaning(lemma, gloss) {
+  const special = {car:'những chiếc ô tô; các xe hơi',house:'những ngôi nhà',issue:'các vấn đề',
+    child:'những đứa trẻ', student:'các học sinh; sinh viên',person:'những người',
+    story:'những câu chuyện',problem:'những vấn đề',city:'các thành phố'};
+  return special[lemma] || `Các ${gloss}`;
+}
+
+export async function resolveWord(word, context='') {
+  const w = normalized(word);
+  const contraction = CONTRACTIONS[w];
+  if (contraction) return {word,base_form:w,meaning_vi:contraction.vi,ipa:contraction.ipa,source:'curated',note:'Dạng viết tắt'};
+
+  const variations = forms(w);
+  const inferredPOS = guessPOS(w, context);
+  const exactCurated = CORE[w];
+  // True dictionary entries such as "news" have priority over speculative stripping.
+  if (exactCurated) {
+    let vi = exactCurated.vi;
+    if (w === 'work') vi = inferredPOS === 'noun' ? 'công việc' : inferredPOS === 'verb' ? 'làm việc' : vi;
+    if (w === 'modern' && /\bhistory\b/i.test(context)) vi = 'cận đại (khi nói về lịch sử)';
+    if (w === 'modern' && /\b(science|technology|building|life|world)\b/i.test(context)) vi = 'hiện đại';
+    return {word,base_form:w,meaning_vi:vi,ipa:await lookupIPA(w) || exactCurated.ipa,note:'',source:'curated'};
+  }
+
+  // When a base form exists in our curated dictionary, use its MEANING, not
+  // the inflected word's description. Example: represents -> represent.
+  const knownBase = variations.find(candidate => candidate.lemma !== w && CORE[candidate.lemma]);
+  if (knownBase) {
+    const c = CORE[knownBase.lemma];
+    const noun = c.pos === 'noun' && inferredPOS !== 'verb';
+    let vi = knownBase.form.includes('plural') && noun
+      ? pluralMeaning(knownBase.lemma, c.vi)
+      : c.vi;
+    if (knownBase.lemma === 'work' && (knownBase.form === '-ing' || inferredPOS === 'verb')) vi = 'làm việc';
+    return {
+      word,base_form:knownBase.lemma,meaning_vi:vi,
+      ipa:await lookupIPA(w) || derivedIPA(w,knownBase.lemma,c.ipa,knownBase.form),
+      note:inflectionNote(w,knownBase.lemma,knownBase.form,c.pos),source:'curated'
+    };
+  }
+
+  // External dictionaries sometimes store only "3rd person singular of X"
+  // under the inflected spelling. Such meta-definitions must never be shown as
+  // the learner-facing Vietnamese meaning. Check the base form instead.
+  let chosen=null, meanings=[];
+  for (const candidate of variations) {
+    const lexical = await lexicalMeanings(candidate.lemma);
+    if (!lexical.length) continue;
+    chosen=candidate;
+    meanings=lexical;
+    break;
+  }
+
+  if (chosen && meanings.length) {
+    meanings.sort((a,b)=>scoreMeaning(b,inferredPOS)-scoreMeaning(a,inferredPOS));
+    const filtered=meanings.filter(m=>scoreMeaning(m,inferredPOS)>0);
+    const best=(filtered.length?filtered:meanings)[0];
+    const isPlural=chosen.lemma!==w && chosen.form.includes('plural')
+      && !(/động|verb/i.test(best.pos) || inferredPOS==='verb');
+    const vi=isPlural ? pluralMeaning(chosen.lemma,best.vi) : best.vi;
+    const ipa=await lookupIPA(w) || (chosen.lemma===w?best.ipa:derivedIPA(w,chosen.lemma,best.ipa,chosen.form));
+    return {word,base_form:chosen.lemma,meaning_vi:vi,ipa,
+      note:inflectionNote(w,chosen.lemma,chosen.form,isPlural?'noun':inferredPOS),source:'minhqnd'};
+  }
+
+  // We cannot safely present a grammatical description as the meaning.
+  return {word,base_form:w,meaning_vi:'Chưa tìm thấy nghĩa tiếng Việt đáng tin cậy cho từ này.',
+    ipa:await lookupIPA(w),note:'',source:'none'};
 }
 
 export default async function handler(request){
