@@ -25,6 +25,9 @@
     .reader{display:none;background:var(--paper);border:1px solid var(--line);border-radius:20px;padding:clamp(20px,4vw,42px);box-shadow:var(--shadow);margin-top:18px}.reader-top{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}.reader h2{font-size:clamp(25px,4vw,35px);line-height:1.2;margin:19px 0 8px}.reader-meta{color:var(--muted);font-size:13px;margin-bottom:25px}.reading-text{font-family:Georgia,serif;font-size:20px;line-height:2.05;color:#293a32;max-width:780px}.reading-text p{margin:0 0 17px}.word{cursor:pointer;border-radius:4px;padding:0 1px;transition:background .12s;-webkit-tap-highlight-color:rgba(216,168,78,.25)}.word:hover,.word:focus{background:#f5e6b8;outline:none}.word.active{background:#f4dfa0;box-shadow:0 2px 0 var(--gold)}
     .reader-note{font-family:inherit;font-size:13px;color:var(--muted);border-top:1px solid var(--line);padding-top:18px;margin-top:25px}
     .word-panel{display:none;position:fixed;z-index:20;right:22px;bottom:22px;width:min(360px,calc(100vw - 28px));max-height:min(72vh,560px);overflow-y:auto;background:white;border:1px solid var(--line);border-radius:18px;box-shadow:0 18px 60px rgba(20,35,28,.2);padding:20px}.word-panel.show{display:block;animation:pop .16s ease-out}@keyframes pop{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+    .other-senses{margin-top:10px;font-size:13px;color:#5b685f}
+    .other-senses summary{cursor:pointer;color:#315c4c;font-weight:650}
+    .other-senses ul{margin:7px 0 0;padding-left:19px;line-height:1.7}
     .panel-head{display:flex;justify-content:space-between;align-items:center;gap:10px;padding-bottom:12px;border-bottom:1px solid var(--line)}.panel-head h3{font-size:25px;margin:0;color:var(--ink)}.close{border:0;background:#f2f3ee;border-radius:50%;width:32px;height:32px;font-size:20px;cursor:pointer}.dictionary-item{padding:13px 0;border-bottom:1px solid #edf0eb}.dictionary-item:last-child{border-bottom:0;padding-bottom:0}.dictionary-label{font-size:11px;letter-spacing:.5px;color:var(--muted);font-weight:800;margin-bottom:6px}.meaning{font-size:18px;font-weight:750;color:var(--green);line-height:1.45}.context-translation{font-size:13px;color:#68766e;line-height:1.5;margin:5px 0 0}.ipa{font-size:14px;color:var(--green);font-weight:700;margin:0}.ipa-large{font-size:20px;letter-spacing:.2px}.pronounce-button{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:#f8faf7;color:var(--ink);border-radius:11px;padding:11px 15px;font-size:14px;font-weight:750;cursor:pointer}.pronounce-button:hover{background:#edf4ef}
     .google-fallback{display:none;margin-top:12px;padding:12px;border:1px solid #e0e9e0;border-radius:12px;background:#f8fbf8;gap:8px;flex-direction:column}
     .google-fallback.show{display:flex}
@@ -105,6 +108,10 @@
     <div class="dictionary-label">1. Nghĩa trong câu</div>
     <div class="meaning" id="wordMeaning">Đang tìm nghĩa...</div>
     <p class="context-translation" id="wordContext"></p>
+    <details class="other-senses" id="otherSenses" hidden>
+      <summary>Các nghĩa khác của từ</summary>
+      <ul id="otherSensesList"></ul>
+    </details>
     <div class="google-fallback" id="googleFallback" aria-live="polite">
       <p id="googleFallbackText">Chưa có nghĩa phù hợp. Bạn có thể tra qua Google Dịch.</p>
       <div class="google-fallback-actions">
@@ -218,7 +225,18 @@ function openArticle(id){
    .join("");
  window.scrollTo({top:0,behavior:"smooth"});
 }
-function sentenceFor(el){const p=el.closest("p");return p?p.textContent.trim():"";}
+function sentenceFor(el){
+  const p=el.closest('p');
+  if(!p)return '';
+  const full=p.textContent;
+  const before=document.createRange();
+  before.selectNodeContents(p);
+  before.setEndBefore(el);
+  const position=before.toString().length;
+  const chunks=[...full.matchAll(/[^.!?]+[.!?]?/g)];
+  const current=chunks.find(x=>position>=x.index && position<x.index+x[0].length);
+  return (current?.[0] || full).trim();
+}
 // V6.4: structured English-Vietnamese dictionary first; MyMemory only when missing.
 let currentLookupRequest = 0;
 const dictionaryCache = new Map();
@@ -239,6 +257,9 @@ async function lookupWord(word, el) {
   $('wordMeaning').textContent = 'Đang tra nghĩa Anh–Việt...';
   $('wordIpa').textContent = 'Đang tra IPA...';
   $('wordContext').textContent = '';
+  $('otherSenses').hidden = true;
+  $('otherSenses').open = false;
+  $('otherSensesList').replaceChildren();
   $('googleFallback').classList.remove('show');
   $('googleWordLink').href = googleTranslateUrl(word);
   $('googleSentenceLink').href = googleTranslateUrl(activeSentence);
@@ -251,7 +272,7 @@ async function lookupWord(word, el) {
   try {
     let data = dictionaryCache.get(key);
     if (!data) {
-      const url = `/.netlify/functions/dictionary-free?v=61&word=${encodeURIComponent(word)}&context=${encodeURIComponent(activeSentence.slice(0,700))}`;
+      const url = `/.netlify/functions/dictionary-free?v=65&word=${encodeURIComponent(word)}&context=${encodeURIComponent(activeSentence.slice(0,700))}`;
       const response = await fetch(url, {cache:'no-store'});
       data = await response.json();
       if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
@@ -268,6 +289,13 @@ async function lookupWord(word, el) {
     $('wordIpa').textContent = data.ipa || 'Chưa tìm được IPA đáng tin cậy.';
     // Only show a tiny note when the original form was resolved to its base form.
     $('wordContext').textContent = data.note || '';
+    const extra = Array.isArray(data.other_meanings) ? data.other_meanings.filter(Boolean) : [];
+    $('otherSenses').hidden = missing || extra.length === 0;
+    $('otherSensesList').replaceChildren(...extra.slice(0,5).map(gloss => {
+      const li=document.createElement('li');
+      li.textContent=gloss;
+      return li;
+    }));
     $('speakWord').onclick = () => speak(word);
 
     // Only use machine translation when the structured dictionary has no meaning.
