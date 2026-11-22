@@ -51,10 +51,23 @@ export function parseData(data) {
   return outputs;
 }
 
-const guessPOS=(word,context)=>{
- const tokens=context.toLowerCase().match(/[a-z]+(?:'[a-z]+)*/g)||[];
- const index=tokens.indexOf(word);
+// Context-sensitive, conservative part-of-speech hints. These are not a full
+// grammar parser; strong auxiliaries take priority over lexical sense order.
+export const guessPOS=(word,context)=>{
+ const tokens=(String(context||'').toLowerCase().match(/[a-z]+(?:'[a-z]+)*/g)||[]);
+ const index=tokens.indexOf(normalized(word));
+ if(index<0)return '';
  const prev=tokens[index-1]||'';
+ const recent=tokens.slice(Math.max(0,index-5),index);
+ const aux=['have','has','had','can','could','will','would','should','must','may','might','do','does','did','am','is','are','was','were','be','been','being'];
+ const adverbs=['ever','never','already','just','recently','often','always','sometimes','also'];
+ const beforeLast=recent.filter(t=>!adverbs.includes(t));
+ const nearest=beforeLast.at(-1)||'';
+ // “Have you ever wondered ...?” is a present-perfect question.
+ // Also matches “She has already wondered”, “He was surprised” etc.
+ if(/(?:ed|ied)$/.test(word) && (aux.includes(nearest) ||
+   (recent.some(t=>['have','has','had'].includes(t)) && recent.length<=5) ||
+   (recent.length>0 && ['he','she','it','they','we','i','you'].includes(prev))))return 'verb';
  if(['to','can','could','will','would','should','must','may','might','do','does','did'].includes(prev))return 'verb';
  if(['a','an','the','these','those','many','some','several','two','three','my','your','their','our'].includes(prev))return 'noun';
  if(['very','really','quite','too','so'].includes(prev))return 'adjective';
@@ -80,7 +93,7 @@ function derivedIPA(word,lemma,base,form){
   if(word===lemma) return base;
   const known={cars:'/kɑːrz/',houses:'/ˈhaʊzɪz/',issues:'/ˈɪʃuːz/',
     children:'/ˈtʃɪldrən/',women:'/ˈwɪmɪn/',men:'/men/',people:'/ˈpiːpəl/',
-    working:'/ˈwɝːkɪŋ/',studies:'/ˈstʌdiz/'};
+    working:'/ˈwɝːkɪŋ/',studies:'/ˈstʌdiz/',wondered:'/ˈwʌndərd/'};
   if(known[word])return known[word];
   if(!base || !base.startsWith('/') || !base.endsWith('/'))return '';
   if(form.includes('plural') || form.includes('third-person')){
@@ -145,7 +158,7 @@ function inflectionNote(word, lemma, form, pos) {
     return `Ngôi thứ ba số ít của “${lemma}”.`;
   }
   if (form === '-ing') return `Dạng -ing của “${lemma}”.`;
-  if (form === 'past') return `Quá khứ của “${lemma}”.`;
+  if (form === 'past') return `Dạng quá khứ / phân từ II của “${lemma}”.`;
   if (form === 'past participle') return `Phân từ II của “${lemma}”.`;
   return `Dạng biến đổi của “${lemma}”.`;
 }
@@ -198,6 +211,12 @@ export async function resolveWord(word, context='') {
 
   const variations = forms(w);
   const inferredPOS = guessPOS(w, context);
+  const verbInflection = inferredPOS === 'verb' && /(?:ed|ied|ing|ies|es|s)$/.test(w);
+  // A conjugated verb should be looked up under its verb lemma first.
+  // Otherwise “wondered” can inherit the noun sense “điều kỳ diệu” from wonder.
+  const prioritized = verbInflection
+    ? [...variations.filter(item => item.lemma!==w), ...variations.filter(item => item.lemma===w)]
+    : variations;
   const exactCurated = CORE[w];
   // True dictionary entries such as "news" have priority over speculative stripping.
   if (exactCurated) {
@@ -210,7 +229,8 @@ export async function resolveWord(word, context='') {
 
   // When a base form exists in our curated dictionary, use its MEANING, not
   // the inflected word's description. Example: represents -> represent.
-  const knownBase = variations.find(candidate => candidate.lemma !== w && CORE[candidate.lemma]);
+  const knownBase = prioritized.find(candidate => candidate.lemma !== w && CORE[candidate.lemma]
+    && (!verbInflection || CORE[candidate.lemma].pos === 'verb'));
   if (knownBase) {
     const c = CORE[knownBase.lemma];
     const noun = c.pos === 'noun' && inferredPOS !== 'verb';
@@ -229,11 +249,18 @@ export async function resolveWord(word, context='') {
   // under the inflected spelling. Such meta-definitions must never be shown as
   // the learner-facing Vietnamese meaning. Check the base form instead.
   let chosen=null, meanings=[];
-  for (const candidate of variations) {
+  for (const candidate of prioritized) {
     const lexical = await lexicalMeanings(candidate.lemma);
     if (!lexical.length) continue;
+    const matching = inferredPOS === 'verb'
+      ? lexical.filter(entry => scoreMeaning(entry,'verb')>0)
+      : inferredPOS === 'noun'
+        ? lexical.filter(entry => scoreMeaning(entry,'noun')>0)
+        : lexical;
+    // Never show a noun sense when grammar strongly indicates a verb.
+    if (inferredPOS === 'verb' && !matching.length) continue;
     chosen=candidate;
-    meanings=lexical;
+    meanings=matching.length ? matching : lexical;
     break;
   }
 

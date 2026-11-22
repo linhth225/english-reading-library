@@ -44,6 +44,11 @@ export const CORE = {
   disease: {vi:'bệnh; căn bệnh',ipa:'/dɪˈziːz/',pos:'noun'},
   problem: {vi:'vấn đề; khó khăn',ipa:'/ˈprɑːbləm/',pos:'noun'},
   issue: {vi:'vấn đề; vấn đề cần giải quyết',ipa:'/ˈɪʃuː/',pos:'noun'},
+  // "goosebumps" is commonly used as a plural noun and means 'nổi da gà'.
+  // Keep both the singular spelling and the more common plural spelling as
+  // exact entries so the inflection fallback cannot produce a missing meaning.
+  goosebump: {vi:'nốt da gà; hiện tượng nổi da gà',ipa:'/ˈɡuːs.bʌmp/',pos:'noun'},
+  goosebumps: {vi:'nổi da gà; cảm giác sởn gai ốc',ipa:'/ˈɡuːs.bʌmps/',pos:'noun'},
   fish: {vi:'cá',ipa:'/fɪʃ/',pos:'noun'},
   salmon: {vi:'cá hồi',ipa:'/ˈsæmən/',pos:'noun'},
   farm: {vi:'trang trại; nuôi trồng',ipa:'/fɑːrm/',pos:'noun'},
@@ -82,6 +87,7 @@ export const CORE = {
   open: {vi:'mở',ipa:'/ˈoʊpən/',pos:'verb'},
   close: {vi:'đóng; gần',ipa:'/kloʊz/',pos:'verb'},
   represent: {vi:'đại diện cho; thể hiện; biểu thị',ipa:'/ˌreprɪˈzent/',pos:'verb'},
+  wonder: {vi:'tự hỏi; thắc mắc; băn khoăn',ipa:'/ˈwʌndər/',pos:'verb'},
   produce: {vi:'sản xuất; tạo ra',ipa:'/prəˈduːs/',pos:'verb'},
   explain: {vi:'giải thích',ipa:'/ɪkˈspleɪn/',pos:'verb'},
   describe: {vi:'mô tả',ipa:'/dɪˈskraɪb/',pos:'verb'},
